@@ -1,9 +1,10 @@
 /**
  * Fly Bird - Royal Flight
- * Complete Game Engine, Dynamic Multi-Theme System, Zero-Lag Mobile Touch & Pro Vector Bird
+ * High-Speed Arcade Engine, Funny English UI, Spectacular Fairytale Castle,
+ * Corner-Only Realm Alerts & Cape-Free Royal Bird
  */
 
-// Canvas roundRect polyfill for older browser support
+// Canvas roundRect polyfill
 if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
   CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, radii) {
     const r = typeof radii === 'number' ? radii : (Array.isArray(radii) ? (radii[0] || 4) : 4);
@@ -18,16 +19,26 @@ if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D
   };
 }
 
-// ==========================================
-// COLOR UTILITIES FOR SMOOTH THEME BLENDING
-// ==========================================
+// Robust color parsing (never falls back to pure white!)
 function hexToRgb(hex) {
-  const clean = hex.replace('#', '');
-  const bigint = parseInt(clean, 16);
-  if (clean.length === 6) {
-    return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
+  if (!hex || typeof hex !== 'string') return [30, 60, 100];
+  if (hex.startsWith('rgb')) {
+    const parts = hex.match(/\d+/g);
+    if (parts && parts.length >= 3) {
+      return [parseInt(parts[0], 10), parseInt(parts[1], 10), parseInt(parts[2], 10)];
+    }
   }
-  return [255, 255, 255];
+  const clean = hex.replace('#', '');
+  if (clean.length === 6) {
+    const bigint = parseInt(clean, 16);
+    return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
+  } else if (clean.length === 3) {
+    const r = parseInt(clean[0] + clean[0], 16);
+    const g = parseInt(clean[1] + clean[1], 16);
+    const b = parseInt(clean[2] + clean[2], 16);
+    return [r, g, b];
+  }
+  return [35, 75, 125];
 }
 
 function lerpColor(c1, c2, t) {
@@ -40,12 +51,436 @@ function lerpColor(c1, c2, t) {
 }
 
 // ==========================================
-// AUDIO SYSTEM (Web Audio API Synthesizer)
+// HIGH-ENERGY ARCADE ACTION SOUNDTRACK
+// Synthesized in real-time via Web Audio API (Zero lag, zero downloads, seamless loop)
 // ==========================================
+const ACTION_NOTE_FREQ = {
+  E2: 82.41, G2: 98.00, A2: 110.00, B2: 123.47,
+  C3: 130.81, D3: 146.83, Ds3: 155.56, E3: 164.81, Fs3: 185.00, G3: 196.00, A3: 220.00, B3: 246.94,
+  C4: 261.63, D4: 293.66, Ds4: 311.13, E4: 329.63, Fs4: 369.99, G4: 392.00, A4: 440.00, B4: 493.88,
+  C5: 523.25, D5: 587.33, Ds5: 622.25, E5: 659.25, Fs5: 739.99, G5: 783.99, A5: 880.00, B5: 987.77,
+  C6: 1046.50, D6: 1174.66, E6: 1318.51
+};
+
+class ActionSoundtrack {
+  constructor(audioCtx, isMutedGetter) {
+    this.ctx = audioCtx;
+    this.isMutedGetter = isMutedGetter;
+    this.isPlaying = false;
+    this.isPaused = false;
+    this.tempo = 136; // Fast arcade action tempo
+    this.intensity = 0; // 0 = Daytime, 1 = Sunset, 2 = Midnight
+    this.step = 0;
+    this.nextStepTime = 0;
+    this.timerId = null;
+    this.noiseBuffer = null;
+    this.musicGain = null;
+    this.compressor = null;
+
+    this.initAudioNodes();
+    this.initNoiseBuffer();
+
+    const F = ACTION_NOTE_FREQ;
+
+    // 64-step Driving Bassline (4 bars of 16 sixteenths)
+    this.bassPattern = [
+      // Bar 0: Em
+      F.E2, F.E3, F.E2, F.E3, F.E2, F.E3, F.G2, F.B2,
+      F.E2, F.E3, F.E2, F.E3, F.E2, F.E3, F.B2, F.D3,
+      // Bar 1: C Major
+      F.C3, F.C4, F.C3, F.C4, F.C3, F.C4, F.E3, F.G3,
+      F.C3, F.C4, F.C3, F.C4, F.C3, F.C4, F.G3, F.B3,
+      // Bar 2: D Major
+      F.D3, F.D4, F.D3, F.D4, F.D3, F.D4, F.Fs3, F.A3,
+      F.D3, F.D4, F.D3, F.D4, F.D3, F.D4, F.A3, F.C4,
+      // Bar 3: B Dominant
+      F.B2, F.B3, F.B2, F.B3, F.B2, F.B3, F.Ds3, F.Fs3,
+      F.B2, F.B3, F.B2, F.B3, F.B2, F.Ds3, F.Fs3, F.A3
+    ];
+
+    // 64-step Action Heroic Lead Riff
+    this.leadPattern = [
+      // Bar 0
+      F.E4, null, F.G4, null, F.B4, null, F.E5, null,
+      F.D5, null, F.B4, null, F.A4, null, F.B4, null,
+      // Bar 1
+      F.G4, null, F.A4, null, F.B4, null, F.D5, null,
+      F.C5, null, F.A4, null, F.G4, null, F.E4, null,
+      // Bar 2
+      F.Fs4, null, F.A4, null, F.D5, null, F.Fs5, null,
+      F.E5, null, F.D5, null, F.A4, null, F.D5, null,
+      // Bar 3
+      F.B4, null, F.Ds5, null, F.Fs5, null, F.A5, null,
+      F.G5, null, F.Fs5, null, F.Ds5, null, F.B4, null
+    ];
+
+    // Arpeggio patterns for Sunset & Midnight
+    this.arpPattern = [
+      // Bar 0: Em
+      F.E5, F.G5, F.B5, F.E6, F.B5, F.G5, F.E5, F.B4,
+      F.E5, F.G5, F.B5, F.E6, F.B5, F.G5, F.B5, F.E6,
+      // Bar 1: C
+      F.C5, F.E5, F.G5, F.C6, F.G5, F.E5, F.C5, F.G4,
+      F.C5, F.E5, F.G5, F.C6, F.G5, F.E5, F.G5, F.C6,
+      // Bar 2: D
+      F.D5, F.Fs5, F.A5, F.D6, F.A5, F.Fs5, F.D5, F.A4,
+      F.D5, F.Fs5, F.A5, F.D6, F.A5, F.Fs5, F.A5, F.D6,
+      // Bar 3: B
+      F.B4, F.Ds5, F.Fs5, F.B5, F.Fs5, F.Ds5, F.B4, F.Fs4,
+      F.B4, F.Ds5, F.Fs5, F.B5, F.Fs5, F.Ds5, F.Fs5, F.B5
+    ];
+  }
+
+  isMuted() {
+    return typeof this.isMutedGetter === 'function' ? this.isMutedGetter() : false;
+  }
+
+  initAudioNodes() {
+    if (!this.ctx || this.musicGain) return;
+    try {
+      this.compressor = this.ctx.createDynamicsCompressor();
+      this.compressor.threshold.setValueAtTime(-18, this.ctx.currentTime);
+      this.compressor.knee.setValueAtTime(12, this.ctx.currentTime);
+      this.compressor.ratio.setValueAtTime(6, this.ctx.currentTime);
+      this.compressor.attack.setValueAtTime(0.003, this.ctx.currentTime);
+      this.compressor.release.setValueAtTime(0.15, this.ctx.currentTime);
+
+      this.musicGain = this.ctx.createGain();
+      this.musicGain.gain.setValueAtTime(this.isMuted() ? 0 : 0.22, this.ctx.currentTime);
+
+      this.musicGain.connect(this.compressor);
+      this.compressor.connect(this.ctx.destination);
+    } catch (e) {}
+  }
+
+  initNoiseBuffer() {
+    if (this.noiseBuffer || !this.ctx) return;
+    try {
+      const sampleRate = this.ctx.sampleRate || 44100;
+      const bufferSize = Math.floor(sampleRate * 0.5);
+      this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, sampleRate);
+      const output = this.noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+    } catch (e) {}
+  }
+
+  triggerKick(time) {
+    if (!this.ctx || this.isMuted()) return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(160, time);
+      osc.frequency.exponentialRampToValueAtTime(36, time + 0.08);
+
+      gain.gain.setValueAtTime(0.72, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.12);
+
+      osc.connect(gain);
+      gain.connect(this.musicGain);
+
+      osc.start(time);
+      osc.stop(time + 0.13);
+    } catch (e) {}
+  }
+
+  triggerSnare(time) {
+    if (!this.ctx || this.isMuted() || !this.noiseBuffer) return;
+    try {
+      // Noise component
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this.noiseBuffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1900, time);
+      filter.Q.setValueAtTime(1.2, time);
+
+      const noiseGain = this.ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.35, time);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.14);
+
+      noise.connect(filter);
+      filter.connect(noiseGain);
+      noiseGain.connect(this.musicGain);
+
+      noise.start(time);
+      noise.stop(time + 0.15);
+
+      // Body punch
+      const osc = this.ctx.createOscillator();
+      const oscGain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(220, time);
+      osc.frequency.exponentialRampToValueAtTime(80, time + 0.08);
+
+      oscGain.gain.setValueAtTime(0.38, time);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, time + 0.09);
+
+      osc.connect(oscGain);
+      oscGain.connect(this.musicGain);
+
+      osc.start(time);
+      osc.stop(time + 0.1);
+    } catch (e) {}
+  }
+
+  triggerHiHat(time, open = false) {
+    if (!this.ctx || this.isMuted() || !this.noiseBuffer) return;
+    try {
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this.noiseBuffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.setValueAtTime(7500, time);
+
+      const gain = this.ctx.createGain();
+      const dur = open ? 0.12 : 0.04;
+      gain.gain.setValueAtTime(open ? 0.22 : 0.13, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.musicGain);
+
+      noise.start(time);
+      noise.stop(time + dur + 0.01);
+    } catch (e) {}
+  }
+
+  triggerBass(freq, time, dur = 0.11) {
+    if (!this.ctx || this.isMuted() || !freq) return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const filter = this.ctx.createBiquadFilter();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, time);
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(950, time);
+      filter.frequency.exponentialRampToValueAtTime(220, time + dur);
+      filter.Q.setValueAtTime(2.8, time);
+
+      gain.gain.setValueAtTime(0.34, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.musicGain);
+
+      osc.start(time);
+      osc.stop(time + dur + 0.02);
+    } catch (e) {}
+  }
+
+  triggerLead(freq, time, dur = 0.14) {
+    if (!this.ctx || this.isMuted() || !freq) return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(freq, time);
+
+      const vol = this.intensity >= 2 ? 0.22 : 0.18;
+      gain.gain.setValueAtTime(vol, time);
+      gain.gain.setValueAtTime(vol, time + dur * 0.7);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+      osc.connect(gain);
+      gain.connect(this.musicGain);
+
+      osc.start(time);
+      osc.stop(time + dur + 0.02);
+    } catch (e) {}
+  }
+
+  triggerArp(freq, time) {
+    if (!this.ctx || this.isMuted() || !freq) return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, time);
+
+      gain.gain.setValueAtTime(0.12, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+
+      osc.connect(gain);
+      gain.connect(this.musicGain);
+
+      osc.start(time);
+      osc.stop(time + 0.09);
+    } catch (e) {}
+  }
+
+  playStep(stepIdx, time) {
+    // 1. Drum Kit
+    const isKick = [0, 4, 8, 12, 14, 16, 20, 24, 28, 32, 36, 40, 44, 46, 48, 52, 56, 60, 62].includes(stepIdx);
+    const isExtraKick = this.intensity >= 2 && [2, 6, 10, 18, 22, 26, 34, 38, 42, 50, 54, 58].includes(stepIdx);
+    if (isKick || isExtraKick) {
+      this.triggerKick(time);
+    }
+
+    const isSnare = [4, 12, 20, 28, 36, 44, 52, 60].includes(stepIdx);
+    if (isSnare) {
+      this.triggerSnare(time);
+    }
+
+    const isOpenHat = [14, 30, 46, 62].includes(stepIdx);
+    const isClosedHat = [2, 6, 10, 18, 22, 26, 34, 38, 42, 50, 54, 58].includes(stepIdx);
+    const isFastHat = this.intensity >= 1 && stepIdx % 2 === 1;
+
+    if (isOpenHat) {
+      this.triggerHiHat(time, true);
+    } else if (isClosedHat || isFastHat) {
+      this.triggerHiHat(time, false);
+    }
+
+    // 2. Rolling Bass
+    const bassNote = this.bassPattern[stepIdx];
+    if (bassNote) {
+      this.triggerBass(bassNote, time, 0.10);
+    }
+
+    // 3. Heroic Action Lead
+    const leadNote = this.leadPattern[stepIdx];
+    if (leadNote) {
+      this.triggerLead(leadNote, time, 0.16);
+    }
+
+    // 4. Arpeggiator (Sunset & Midnight adrenaline boost!)
+    if (this.intensity >= 1) {
+      const arpNote = this.arpPattern[stepIdx];
+      if (arpNote) {
+        this.triggerArp(arpNote, time);
+      }
+    }
+  }
+
+  scheduler() {
+    if (!this.isPlaying || this.isPaused || !this.ctx) return;
+    try {
+      const secPerBeat = 60.0 / this.tempo;
+      const secPerStep = secPerBeat / 4;
+
+      while (this.nextStepTime < this.ctx.currentTime + 0.12) {
+        this.playStep(this.step, this.nextStepTime);
+        this.nextStepTime += secPerStep;
+        this.step = (this.step + 1) % 64;
+      }
+    } catch (e) {}
+  }
+
+  start() {
+    if (this.isPlaying && !this.isPaused) return;
+    if (!this.ctx) return;
+
+    this.initAudioNodes();
+    this.initNoiseBuffer();
+
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+
+    this.isPlaying = true;
+    this.isPaused = false;
+    this.step = 0;
+    this.nextStepTime = this.ctx.currentTime + 0.05;
+
+    const targetVol = this.isMuted() ? 0 : 0.22;
+    if (this.musicGain) {
+      try {
+        this.musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
+        this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, this.ctx.currentTime);
+        this.musicGain.gain.linearRampToValueAtTime(targetVol, this.ctx.currentTime + 0.1);
+      } catch (e) {}
+    }
+
+    clearInterval(this.timerId);
+    this.timerId = setInterval(() => this.scheduler(), 25);
+  }
+
+  pause() {
+    if (!this.isPlaying || this.isPaused) return;
+    this.isPaused = true;
+    if (this.musicGain && this.ctx) {
+      try {
+        this.musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
+        this.musicGain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.05);
+      } catch (e) {}
+    }
+    clearInterval(this.timerId);
+    this.timerId = null;
+  }
+
+  resume() {
+    if (!this.isPlaying || !this.isPaused) return;
+    if (!this.ctx) return;
+
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+    this.isPaused = false;
+    this.nextStepTime = this.ctx.currentTime + 0.05;
+
+    const targetVol = this.isMuted() ? 0 : 0.22;
+    if (this.musicGain) {
+      try {
+        this.musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
+        this.musicGain.gain.linearRampToValueAtTime(targetVol, this.ctx.currentTime + 0.08);
+      } catch (e) {}
+    }
+
+    clearInterval(this.timerId);
+    this.timerId = setInterval(() => this.scheduler(), 25);
+  }
+
+  stop() {
+    if (!this.isPlaying) return;
+    this.isPlaying = false;
+    this.isPaused = false;
+    this.step = 0;
+    if (this.musicGain && this.ctx) {
+      try {
+        this.musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
+        this.musicGain.gain.linearRampToValueAtTime(0.0001, this.ctx.currentTime + 0.12);
+      } catch (e) {}
+    }
+    clearInterval(this.timerId);
+    this.timerId = null;
+  }
+
+  setMuted(muted) {
+    if (!this.musicGain || !this.ctx) return;
+    try {
+      const target = muted ? 0 : (this.isPlaying && !this.isPaused ? 0.22 : 0);
+      this.musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.musicGain.gain.linearRampToValueAtTime(target, this.ctx.currentTime + 0.05);
+    } catch (e) {}
+  }
+
+  setIntensity(level) {
+    this.intensity = level;
+    if (level >= 2) {
+      this.tempo = 144;
+    } else if (level === 1) {
+      this.tempo = 140;
+    } else {
+      this.tempo = 136;
+    }
+  }
+}
+
+// Web Audio API Synthesizer & Sound FX Manager
 class SoundFX {
   constructor() {
     this.ctx = null;
     this.muted = localStorage.getItem('flybird_muted') === 'true';
+    this.music = null;
     this.initAudio();
   }
 
@@ -54,6 +489,7 @@ class SoundFX {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       if (AudioContext) {
         this.ctx = new AudioContext();
+        this.music = new ActionSoundtrack(this.ctx, () => this.muted);
       }
     } catch (e) {}
   }
@@ -68,7 +504,38 @@ class SoundFX {
   toggleMute() {
     this.muted = !this.muted;
     localStorage.setItem('flybird_muted', this.muted);
+    if (this.music) {
+      this.music.setMuted(this.muted);
+    }
     return this.muted;
+  }
+
+  startMusic() {
+    this.ensureContext();
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().then(() => {
+        if (this.music) this.music.start();
+      }).catch(() => {});
+    } else if (this.music) {
+      this.music.start();
+    }
+  }
+
+  pauseMusic() {
+    if (this.music) this.music.pause();
+  }
+
+  resumeMusic() {
+    this.ensureContext();
+    if (this.music) this.music.resume();
+  }
+
+  stopMusic() {
+    if (this.music) this.music.stop();
+  }
+
+  setMusicIntensity(level) {
+    if (this.music) this.music.setIntensity(level);
   }
 
   playFlap() {
@@ -82,17 +549,17 @@ class SoundFX {
       const gain = this.ctx.createGain();
 
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(360, now);
-      osc.frequency.exponentialRampToValueAtTime(840, now + 0.12);
+      osc.frequency.setValueAtTime(380, now);
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.11);
 
       gain.gain.setValueAtTime(0.28, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.11);
 
       osc.connect(gain);
       gain.connect(this.ctx.destination);
 
       osc.start(now);
-      osc.stop(now + 0.13);
+      osc.stop(now + 0.12);
     } catch (e) {}
   }
 
@@ -106,19 +573,19 @@ class SoundFX {
       [1174, 1760, 2349].forEach((freq, idx) => {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        const delay = idx * 0.06;
+        const delay = idx * 0.055;
 
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(freq, now + delay);
 
-        gain.gain.setValueAtTime(0.28, now + delay);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.28);
+        gain.gain.setValueAtTime(0.3, now + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.25);
 
         osc.connect(gain);
         gain.connect(this.ctx.destination);
 
         osc.start(now + delay);
-        osc.stop(now + delay + 0.3);
+        osc.stop(now + delay + 0.27);
       });
     } catch (e) {}
   }
@@ -134,17 +601,17 @@ class SoundFX {
       const gain = this.ctx.createGain();
 
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(920, now);
-      osc.frequency.setValueAtTime(1240, now + 0.08);
+      osc.frequency.setValueAtTime(940, now);
+      osc.frequency.setValueAtTime(1280, now + 0.07);
 
-      gain.gain.setValueAtTime(0.22, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.24);
+      gain.gain.setValueAtTime(0.24, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
 
       osc.connect(gain);
       gain.connect(this.ctx.destination);
 
       osc.start(now);
-      osc.stop(now + 0.25);
+      osc.stop(now + 0.23);
     } catch (e) {}
   }
 
@@ -159,19 +626,19 @@ class SoundFX {
       notes.forEach((freq, idx) => {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        const start = now + idx * 0.1;
+        const start = now + idx * 0.09;
 
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(freq, start);
 
         gain.gain.setValueAtTime(0.3, start);
-        gain.gain.exponentialRampToValueAtTime(0.01, start + 0.25);
+        gain.gain.exponentialRampToValueAtTime(0.01, start + 0.22);
 
         osc.connect(gain);
         gain.connect(this.ctx.destination);
 
         osc.start(start);
-        osc.stop(start + 0.26);
+        osc.stop(start + 0.24);
       });
     } catch (e) {}
   }
@@ -187,17 +654,17 @@ class SoundFX {
       const gain = this.ctx.createGain();
 
       osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(240, now);
-      osc.frequency.exponentialRampToValueAtTime(45, now + 0.22);
+      osc.frequency.setValueAtTime(260, now);
+      osc.frequency.exponentialRampToValueAtTime(45, now + 0.2);
 
-      gain.gain.setValueAtTime(0.4, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.24);
+      gain.gain.setValueAtTime(0.42, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
 
       osc.connect(gain);
       gain.connect(this.ctx.destination);
 
       osc.start(now);
-      osc.stop(now + 0.25);
+      osc.stop(now + 0.23);
     } catch (e) {}
   }
 
@@ -208,47 +675,59 @@ class SoundFX {
 
     try {
       const now = this.ctx.currentTime;
-      const notes = [440, 392, 349, 261];
+      const notes = [440, 392, 349, 247];
       notes.forEach((freq, idx) => {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        const start = now + idx * 0.14;
+        const start = now + idx * 0.12;
 
         osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, start);
 
         gain.gain.setValueAtTime(0.25, start);
-        gain.gain.exponentialRampToValueAtTime(0.01, start + 0.28);
+        gain.gain.exponentialRampToValueAtTime(0.01, start + 0.25);
 
         osc.connect(gain);
         gain.connect(this.ctx.destination);
 
         osc.start(start);
-        osc.stop(start + 0.3);
+        osc.stop(start + 0.27);
       });
     } catch (e) {}
   }
 }
 
-// ==========================================
-// REALM THEMES DEFINITIONS
-// ==========================================
+// Funny Quotes
+const FUNNY_DEATH_QUOTES = [
+  "Emotional damage! 💀",
+  "That pipe came out of nowhere, right?",
+  "Gravity: 1 • Bird: 0 🪦",
+  "Certified Skill Issue! 🤦",
+  "Those pipes have personal beef with you.",
+  "Did you forget how to flap? 🪽",
+  "Oof! The floor is NOT lava, but it hurts.",
+  "Bonk of the Century! 💥",
+  "At least your crown stayed shiny! 👑"
+];
+
+// 100% Pure Hex Themes (Zero white-glitch risk!)
 const THEMES = [
   {
     id: 0,
-    name: "☀️ Ziua",
-    alertTitle: "☀️ REGATUL ZILEI",
+    name: "☀️ Day",
     skyTop: "#1e88e5",
     skyMid: "#64b5f6",
-    skyBot: "#e1f5fe",
+    skyBot: "#bbdefb",
     sunColor: "#fff9c4",
-    sunGlow: "rgba(255, 238, 88, 0.4)",
+    sunGlow: "rgba(255, 238, 88, 0.45)",
     sunY: 130,
     showMoon: false,
-    cloudColor: "rgba(255, 255, 255, 0.92)",
-    cloudShade: "rgba(187, 222, 251, 0.5)",
-    mountainColor: "rgba(79, 134, 198, 0.35)",
-    castleColor: "rgba(41, 98, 175, 0.42)",
+    cloudColor: "#ffffff",
+    cloudShade: "#bbdefb",
+    mountainColor: "#32629b",
+    castleColor: "#1d457a",
+    castleRoof: "#29b6f6",
+    castleWindow: "#fff59d",
     hillBack: "#5cbf60",
     hillFront: "#43a047",
     pipeBase: "#43a047",
@@ -259,21 +738,22 @@ const THEMES = [
   },
   {
     id: 1,
-    name: "🌅 Apus Regal",
-    alertTitle: "🌅 NIVEL 2: APUS REGAL!",
+    name: "🌅 Sunset",
     skyTop: "#3e1254",
     skyMid: "#c2185b",
     skyBot: "#ffb74d",
     sunColor: "#ff7043",
-    sunGlow: "rgba(255, 112, 67, 0.45)",
+    sunGlow: "rgba(255, 112, 67, 0.5)",
     sunY: 260,
     showMoon: false,
-    cloudColor: "rgba(255, 224, 178, 0.88)",
-    cloudShade: "rgba(194, 24, 91, 0.38)",
-    mountainColor: "rgba(88, 24, 98, 0.42)",
-    castleColor: "rgba(61, 14, 74, 0.55)",
-    hillBack: "#795548",
-    hillFront: "#5d4037",
+    cloudColor: "#ffe0b2",
+    cloudShade: "#ad1457",
+    mountainColor: "#51175e",
+    castleColor: "#391044",
+    castleRoof: "#e91e63",
+    castleWindow: "#ffe082",
+    hillBack: "#6d4c41",
+    hillFront: "#4e342e",
     pipeBase: "#558b2f",
     pipeHighlight: "#9ccc65",
     pipeShadow: "#33691e",
@@ -282,19 +762,20 @@ const THEMES = [
   },
   {
     id: 2,
-    name: "🌙 Noapte Regală",
-    alertTitle: "🌙 NIVEL 3: NOAPTE REGALĂ!",
+    name: "🌙 Midnight",
     skyTop: "#050b1a",
     skyMid: "#0d1b3e",
     skyBot: "#1a237e",
     sunColor: "#ffffff",
-    sunGlow: "rgba(255, 255, 255, 0.15)",
+    sunGlow: "rgba(255, 255, 255, 0.2)",
     sunY: -100,
     showMoon: true,
-    cloudColor: "rgba(57, 73, 171, 0.65)",
-    cloudShade: "rgba(26, 35, 126, 0.7)",
-    mountainColor: "rgba(13, 27, 62, 0.65)",
-    castleColor: "rgba(8, 17, 43, 0.8)",
+    cloudColor: "#1a237e",
+    cloudShade: "#0d1b3e",
+    mountainColor: "#0b1533",
+    castleColor: "#060c20",
+    castleRoof: "#3949ab",
+    castleWindow: "#ffd54f",
     hillBack: "#1b5e20",
     hillFront: "#0d3b13",
     pipeBase: "#2e7d32",
@@ -305,17 +786,17 @@ const THEMES = [
   }
 ];
 
-// Game Configuration
+// High-Speed Arcade Physics Configuration
 const CONFIG = {
   V_WIDTH: 440,
   V_HEIGHT: 740,
-  GRAVITY: 0.38,
-  FLAP_POWER: -7.5,
-  MAX_FALL_SPEED: 11,
-  PIPE_SPEED_BASE: 2.3,
-  PIPE_SPAWN_INTERVAL: 125,
-  PIPE_GAP: 165,
-  PIPE_WIDTH: 70,
+  GRAVITY: 0.42,
+  FLAP_POWER: -7.9,
+  MAX_FALL_SPEED: 12.5,
+  PIPE_SPEED_BASE: 3.3,
+  PIPE_SPAWN_INTERVAL: 96,
+  PIPE_GAP: 168,
+  PIPE_WIDTH: 72,
   GROUND_HEIGHT: 95
 };
 
@@ -325,7 +806,7 @@ const CONFIG = {
 class FlyBirdGame {
   constructor() {
     this.canvas = document.getElementById('game-canvas');
-    this.ctx = this.canvas.getContext('2d');
+    this.ctx = this.canvas.getContext('2d', { alpha: false });
     this.sound = new SoundFX();
 
     // DOM UI Elements
@@ -335,14 +816,14 @@ class FlyBirdGame {
     this.inGameScoreEl = document.getElementById('in-game-score');
     this.coinCountEl = document.getElementById('coin-count');
     this.realmIndicatorEl = document.getElementById('realm-indicator');
-    this.realmAlertEl = document.getElementById('realm-alert');
-    this.realmAlertTextEl = document.getElementById('realm-alert-text');
+    this.realmPillEl = document.getElementById('realm-pill');
     this.bestScoreDisplay = document.getElementById('best-score-display');
     this.finalScoreEl = document.getElementById('final-score');
     this.finalBestEl = document.getElementById('final-best');
     this.newRecordTag = document.getElementById('new-record-tag');
     this.finalCoinsEl = document.getElementById('final-coins');
     this.finalRealmEl = document.getElementById('final-realm');
+    this.funnyQuoteEl = document.getElementById('funny-quote');
     this.medalDisplayEl = document.getElementById('medal-display');
     this.muteBtn = document.getElementById('mute-btn');
     this.pauseBtn = document.getElementById('pause-btn');
@@ -362,9 +843,9 @@ class FlyBirdGame {
     this.prevThemeIdx = 0;
     this.themeTransition = 1.0;
 
-    // Player Bird
+    // Player Bird (No cape, pure crown & plump cuteness)
     this.bird = {
-      x: 105,
+      x: 110,
       y: CONFIG.V_HEIGHT / 2 - 35,
       vy: 0,
       radius: 20,
@@ -407,10 +888,10 @@ class FlyBirdGame {
 
   initAtmosphere() {
     this.clouds = [
-      { x: 30, y: 70, scale: 0.95, speed: 0.3 },
-      { x: 210, y: 130, scale: 1.25, speed: 0.45 },
-      { x: 380, y: 55, scale: 0.75, speed: 0.28 },
-      { x: 130, y: 200, scale: 0.85, speed: 0.35 }
+      { x: 30, y: 70, scale: 0.95, speed: 0.4 },
+      { x: 210, y: 130, scale: 1.25, speed: 0.55 },
+      { x: 380, y: 55, scale: 0.75, speed: 0.35 },
+      { x: 130, y: 200, scale: 0.85, speed: 0.45 }
     ];
 
     this.stars = [];
@@ -429,24 +910,20 @@ class FlyBirdGame {
       this.fireflies.push({
         x: Math.random() * CONFIG.V_WIDTH,
         y: 200 + Math.random() * (CONFIG.V_HEIGHT - CONFIG.GROUND_HEIGHT - 220),
-        vx: (Math.random() - 0.5) * 0.8,
-        vy: (Math.random() - 0.5) * 0.5,
+        vx: (Math.random() - 0.5) * 1.0,
+        vy: (Math.random() - 0.5) * 0.6,
         pulseSpeed: 0.05 + Math.random() * 0.05,
         pulsePhase: Math.random() * Math.PI * 2
       });
     }
   }
 
-  // ==========================================
-  // MOBILE TOUCH & DESKTOP INPUT HANDLERS
-  // ==========================================
   bindEvents() {
     window.addEventListener('resize', () => this.setupResolution());
 
     const handleAction = (e) => {
-      // Debounce protection against rapid dual-firing (e.g. touchstart + pointerdown)
       const now = performance.now();
-      if (now - this.lastActionTimestamp < 60) return;
+      if (now - this.lastActionTimestamp < 50) return;
       this.lastActionTimestamp = now;
 
       if (e && e.target) {
@@ -466,13 +943,13 @@ class FlyBirdGame {
       }
     };
 
-    // 1. Mobile Direct Touch (Zero Lag, preventDefault stops all browser zoom/scroll)
+    // Mobile Direct Touch
     this.canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
       handleAction(e);
     }, { passive: false });
 
-    // 2. Desktop Pointerdown / Click
+    // Desktop Click
     this.canvas.addEventListener('pointerdown', (e) => {
       if (e.pointerType !== 'touch') {
         e.preventDefault();
@@ -480,7 +957,6 @@ class FlyBirdGame {
       }
     });
 
-    // Touch wrapper as fallback
     const wrapper = document.getElementById('game-wrapper');
     wrapper.addEventListener('touchstart', (e) => {
       if (!e.target.closest('button')) {
@@ -489,7 +965,7 @@ class FlyBirdGame {
       }
     }, { passive: false });
 
-    // 3. Desktop Keyboard
+    // Desktop Keyboard
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
         e.preventDefault();
@@ -501,7 +977,7 @@ class FlyBirdGame {
       }
     });
 
-    // 4. UI Buttons Touch & Click
+    // Buttons
     const tapBtn = document.getElementById('tap-to-fly-btn');
     if (tapBtn) {
       const handleTapBtn = (e) => {
@@ -583,6 +1059,7 @@ class FlyBirdGame {
     this.pauseScreen.classList.remove('active');
     this.bird.vy = CONFIG.FLAP_POWER;
     this.sound.playFlap();
+    this.sound.startMusic();
     this.spawnFeathers();
   }
 
@@ -593,12 +1070,11 @@ class FlyBirdGame {
     this.sound.playFlap();
     this.spawnFeathers();
 
-    // Spawn tiny golden magic sparkles trailing from crown
     for (let i = 0; i < 3; i++) {
       this.goldSparkles.push({
         x: this.bird.x + (Math.random() - 0.5) * 16,
         y: this.bird.y - 18 + (Math.random() - 0.5) * 8,
-        vx: -1.8 - Math.random() * 1.5,
+        vx: -2.2 - Math.random() * 2,
         vy: (Math.random() - 0.5) * 2,
         size: 2.5 + Math.random() * 2,
         alpha: 1,
@@ -611,15 +1087,19 @@ class FlyBirdGame {
     if (this.state === 'PLAYING') {
       this.state = 'PAUSED';
       this.pauseScreen.classList.add('active');
+      this.sound.pauseMusic();
     } else if (this.state === 'PAUSED') {
       this.state = 'PLAYING';
       this.pauseScreen.classList.remove('active');
       this.lastTime = performance.now();
+      this.sound.resumeMusic();
     }
   }
 
   resetGame() {
     this.state = 'START';
+    this.sound.stopMusic();
+    this.sound.setMusicIntensity(0);
     this.score = 0;
     this.coins = 0;
     this.frame = 0;
@@ -633,7 +1113,7 @@ class FlyBirdGame {
     this.particles = [];
     this.goldSparkles = [];
 
-    this.bird.x = 105;
+    this.bird.x = 110;
     this.bird.y = CONFIG.V_HEIGHT / 2 - 35;
     this.bird.vy = 0;
     this.bird.angle = 0;
@@ -645,41 +1125,43 @@ class FlyBirdGame {
   }
 
   // ==========================================
-  // REALM THEME PROGRESSION
+  // REALM PROGRESSION (Corner-only indicator!)
   // ==========================================
   checkThemeMilestones() {
     let targetIdx = 0;
     if (this.score >= 25) {
-      targetIdx = 2; // Midnight Realm (25+ pts)
+      targetIdx = 2; // Midnight (25+ pts)
     } else if (this.score >= 10) {
-      targetIdx = 1; // Sunset Realm (10+ pts)
+      targetIdx = 1; // Sunset (10+ pts)
     } else {
-      targetIdx = 0; // Daytime Realm (0-9 pts)
+      targetIdx = 0; // Daytime
     }
 
     if (targetIdx !== this.activeThemeIdx) {
       this.prevThemeIdx = this.activeThemeIdx;
       this.activeThemeIdx = targetIdx;
       this.themeTransition = 0.0;
-      this.triggerThemeAlert(THEMES[targetIdx]);
+      
+      // Update corner HUD pill ONLY (No middle popup!)
+      if (this.realmIndicatorEl) {
+        this.realmIndicatorEl.textContent = THEMES[targetIdx].name;
+      }
+      if (this.realmPillEl) {
+        this.realmPillEl.classList.remove('realm-glow-pop');
+        void this.realmPillEl.offsetWidth; // force reflow
+        this.realmPillEl.classList.add('realm-glow-pop');
+      }
+
+      this.sound.setMusicIntensity(targetIdx);
       this.sound.playLevelUp();
     }
-  }
-
-  triggerThemeAlert(theme) {
-    if (!this.realmAlertEl) return;
-    this.realmAlertTextEl.textContent = theme.alertTitle;
-    this.realmAlertEl.classList.add('show');
-    clearTimeout(this.alertTimeout);
-    this.alertTimeout = setTimeout(() => {
-      this.realmAlertEl.classList.remove('show');
-    }, 2800);
   }
 
   gameOver() {
     if (this.state === 'GAMEOVER') return;
     this.state = 'GAMEOVER';
-    this.gameOverDelay = 25;
+    this.sound.stopMusic();
+    this.gameOverDelay = 22;
     this.shakeTime = 20;
 
     this.sound.playHit();
@@ -699,25 +1181,33 @@ class FlyBirdGame {
     this.finalCoinsEl.textContent = `+${this.coins}`;
     this.finalRealmEl.textContent = THEMES[this.activeThemeIdx].name;
 
+    if (this.funnyQuoteEl) {
+      const randomQuote = FUNNY_DEATH_QUOTES[Math.floor(Math.random() * FUNNY_DEATH_QUOTES.length)];
+      this.funnyQuoteEl.textContent = randomQuote;
+    }
+
     if (this.newRecordTag) {
       this.newRecordTag.style.display = isNewBest && this.score > 0 ? 'inline-block' : 'none';
     }
 
-    // Royal Medals
-    let medal = 'Niciuna';
+    // Funny Medals
+    let medal = 'None';
     let icon = '—';
     if (this.score >= 50) {
-      medal = 'Coroană de Platină 👑';
+      medal = 'Giga-King of the Sky 👑';
       icon = '👑';
     } else if (this.score >= 25) {
-      medal = 'Aur Regal 🥇';
+      medal = 'Golden Chad 🥇';
       icon = '🥇';
     } else if (this.score >= 15) {
-      medal = 'Argint Regal 🥈';
+      medal = 'Silver Eagle 🥈';
       icon = '🥈';
     } else if (this.score >= 7) {
-      medal = 'Aripă de Bronz 🥉';
+      medal = 'Bronze Wing 🥉';
       icon = '🥉';
+    } else {
+      medal = 'Moldy Potato 🥔';
+      icon = '🥔';
     }
     this.medalDisplayEl.innerHTML = `<span class="medal-icon">${icon}</span> ${medal}`;
 
@@ -725,9 +1215,9 @@ class FlyBirdGame {
     this.updateHUD();
 
     // Explosion particles
-    for (let i = 0; i < 26; i++) {
-      const angle = (Math.PI * 2 * i) / 26;
-      const speed = 2 + Math.random() * 5.5;
+    for (let i = 0; i < 28; i++) {
+      const angle = (Math.PI * 2 * i) / 28;
+      const speed = 2 + Math.random() * 6;
       this.particles.push({
         x: this.bird.x,
         y: this.bird.y,
@@ -791,12 +1281,12 @@ class FlyBirdGame {
       this.particles.push({
         x: this.bird.x - 18 + Math.random() * 8,
         y: this.bird.y + 4 + Math.random() * 8,
-        vx: -1.6 - Math.random() * 2,
+        vx: -2.0 - Math.random() * 2,
         vy: (Math.random() - 0.5) * 2.5,
         size: 3 + Math.random() * 4,
         color: '#ffffff',
         alpha: 0.9,
-        life: 22
+        life: 20
       });
     }
   }
@@ -813,13 +1303,13 @@ class FlyBirdGame {
         size: 3 + Math.random() * 5,
         color: ['#fff9c4', '#ffca28', '#ff9800', '#ffffff'][Math.floor(Math.random() * 4)],
         alpha: 1,
-        life: 28
+        life: 26
       });
     }
   }
 
   // ==========================================
-  // PHYSICS & UPDATE LOOP
+  // PHYSICS & UPDATE LOOP (Fast, Zero Lag)
   // ==========================================
   update() {
     if (this.state === 'PAUSED') return;
@@ -829,7 +1319,7 @@ class FlyBirdGame {
     if (this.shakeTime > 0) this.shakeTime--;
 
     if (this.themeTransition < 1.0) {
-      this.themeTransition = Math.min(1.0, this.themeTransition + 0.02);
+      this.themeTransition = Math.min(1.0, this.themeTransition + 0.025);
     }
 
     this.fireflies.forEach(f => {
@@ -841,18 +1331,18 @@ class FlyBirdGame {
     });
 
     if (this.state === 'START') {
-      this.bird.y = CONFIG.V_HEIGHT / 2 - 35 + Math.sin(this.frame * 0.08) * 12;
-      this.bird.angle = Math.sin(this.frame * 0.08) * 0.08;
-      this.bird.wingTimer += 0.06;
-      this.scrollScenery(1.2);
+      this.bird.y = CONFIG.V_HEIGHT / 2 - 35 + Math.sin(this.frame * 0.09) * 12;
+      this.bird.angle = Math.sin(this.frame * 0.09) * 0.08;
+      this.bird.wingTimer += 0.08;
+      this.scrollScenery(1.8);
       return;
     }
 
     if (this.state === 'GAMEOVER') {
       if (this.bird.y + this.bird.radius < CONFIG.V_HEIGHT - CONFIG.GROUND_HEIGHT) {
-        this.bird.vy += CONFIG.GRAVITY * 1.25;
+        this.bird.vy += CONFIG.GRAVITY * 1.3;
         this.bird.y += this.bird.vy;
-        this.bird.angle = Math.min(Math.PI / 2, this.bird.angle + 0.12);
+        this.bird.angle = Math.min(Math.PI / 2, this.bird.angle + 0.14);
       }
       this.updateParticles();
       return;
@@ -860,7 +1350,7 @@ class FlyBirdGame {
 
     // PLAYING:
     this.scrollScenery(this.speed);
-    this.speed = CONFIG.PIPE_SPEED_BASE + Math.min(1.6, Math.floor(this.score / 10) * 0.18);
+    this.speed = CONFIG.PIPE_SPEED_BASE + Math.min(2.0, Math.floor(this.score / 8) * 0.22);
 
     // Bird physics
     this.bird.vy += CONFIG.GRAVITY;
@@ -868,12 +1358,12 @@ class FlyBirdGame {
     this.bird.y += this.bird.vy;
 
     if (this.bird.vy < 0) {
-      this.bird.angle = Math.max(-0.45, this.bird.angle - 0.12);
+      this.bird.angle = Math.max(-0.48, this.bird.angle - 0.14);
     } else {
-      this.bird.angle = Math.min(1.25, this.bird.angle + 0.045);
+      this.bird.angle = Math.min(1.25, this.bird.angle + 0.05);
     }
 
-    this.bird.wingTimer += (this.bird.vy < 0 ? 0.25 : 0.08);
+    this.bird.wingTimer += (this.bird.vy < 0 ? 0.3 : 0.09);
 
     // Blinking
     this.bird.blinkTimer++;
@@ -886,16 +1376,15 @@ class FlyBirdGame {
     }
 
     // Spawn pipes
-    if (this.frame % Math.max(95, CONFIG.PIPE_SPAWN_INTERVAL - Math.floor(this.score / 6) * 2) === 0) {
+    if (this.frame % Math.max(78, CONFIG.PIPE_SPAWN_INTERVAL - Math.floor(this.score / 6) * 3) === 0) {
       this.spawnPipes();
     }
 
-    // Collision Box
     const birdBox = {
-      x: this.bird.x - this.bird.radius * 0.76,
-      y: this.bird.y - this.bird.radius * 0.76,
-      w: this.bird.radius * 1.52,
-      h: this.bird.radius * 1.52
+      x: this.bird.x - this.bird.radius * 0.75,
+      y: this.bird.y - this.bird.radius * 0.75,
+      w: this.bird.radius * 1.5,
+      h: this.bird.radius * 1.5
     };
 
     // Update Pipes
@@ -922,7 +1411,7 @@ class FlyBirdGame {
         return;
       }
 
-      if (p.x + p.width < -50) {
+      if (p.x + p.width < -60) {
         this.pipes.splice(i, 1);
       }
     }
@@ -931,7 +1420,7 @@ class FlyBirdGame {
     for (let i = this.coinItems.length - 1; i >= 0; i--) {
       const c = this.coinItems[i];
       c.x -= this.speed;
-      c.bobPhase += 0.08;
+      c.bobPhase += 0.1;
 
       const currentY = c.y + Math.sin(c.bobPhase) * 6;
       const dx = this.bird.x - c.x;
@@ -973,7 +1462,7 @@ class FlyBirdGame {
 
   scrollScenery(amt) {
     this.groundScroll = (this.groundScroll + amt) % 36;
-    this.hillScroll = (this.hillScroll + amt * 0.4) % 200;
+    this.hillScroll = (this.hillScroll + amt * 0.45) % 200;
 
     this.clouds.forEach(cloud => {
       cloud.x -= cloud.speed * (amt / 2);
@@ -1000,7 +1489,7 @@ class FlyBirdGame {
       pt.x += pt.vx;
       pt.y += pt.vy;
       pt.alpha -= 1 / pt.life;
-      pt.size *= 0.96;
+      pt.size *= 0.95;
       if (pt.alpha <= 0 || pt.size <= 0.5) {
         this.particles.splice(i, 1);
       }
@@ -1011,7 +1500,7 @@ class FlyBirdGame {
       sp.x += sp.vx;
       sp.y += sp.vy;
       sp.alpha -= 1 / sp.life;
-      sp.size *= 0.96;
+      sp.size *= 0.95;
       if (sp.alpha <= 0 || sp.size <= 0.4) {
         this.goldSparkles.splice(i, 1);
       }
@@ -1026,7 +1515,7 @@ class FlyBirdGame {
     ctx.save();
 
     if (this.shakeTime > 0) {
-      const intensity = (this.shakeTime / 20) * 9;
+      const intensity = (this.shakeTime / 20) * 10;
       const sx = (Math.random() - 0.5) * intensity;
       const sy = (Math.random() - 0.5) * intensity;
       ctx.translate(sx, sy);
@@ -1061,16 +1550,16 @@ class FlyBirdGame {
       this.drawSun(ctx, currTheme, prevTheme, t, sunAlpha);
     }
 
-    // 4. Parallax Mountains
+    // 4. Parallax Misty Mountains
     this.drawMountains(ctx, currTheme, prevTheme, t);
 
-    // 5. Clouds
+    // 5. Spectacular Royal Fairytale Castle
+    this.drawSpectacularCastle(ctx, currTheme, prevTheme, t);
+
+    // 6. Clouds
     this.drawClouds(ctx, currTheme, prevTheme, t);
 
-    // 6. Castles
-    this.drawCastles(ctx, currTheme, prevTheme, t);
-
-    // 7. Rolling Hills
+    // 7. Rolling Green Hills
     this.drawHills(ctx, currTheme, prevTheme, t);
 
     // 8. Fireflies
@@ -1087,7 +1576,7 @@ class FlyBirdGame {
     // 11. Particles & Sparkles
     this.drawParticles(ctx);
 
-    // 12. Enhanced Royal Bird
+    // 12. Cape-Free Royal Bird
     this.drawRoyalBird(ctx);
 
     // 13. Ground
@@ -1166,8 +1655,8 @@ class FlyBirdGame {
       ctx.fill();
     });
 
-    if (this.frame % 180 < 25) {
-      const shootProg = (this.frame % 180) / 25;
+    if (this.frame % 160 < 25) {
+      const shootProg = (this.frame % 160) / 25;
       const sx = 100 + shootProg * 140;
       const sy = 40 + shootProg * 70;
       ctx.globalAlpha = (1 - shootProg) * alpha;
@@ -1199,6 +1688,7 @@ class FlyBirdGame {
     ctx.restore();
   }
 
+  // Mountains: Beautiful soft atmospheric ridges with NO WHITE GLITCH!
   drawMountains(ctx, curr, prev, t) {
     const mountainCol = lerpColor(prev.mountainColor, curr.mountainColor, t);
     ctx.fillStyle = mountainCol;
@@ -1207,15 +1697,110 @@ class FlyBirdGame {
     ctx.beginPath();
     ctx.moveTo(0, baseY);
     ctx.lineTo(0, baseY - 60);
-    ctx.lineTo(70, baseY - 130);
-    ctx.lineTo(150, baseY - 75);
-    ctx.lineTo(240, baseY - 150);
-    ctx.lineTo(330, baseY - 90);
-    ctx.lineTo(410, baseY - 165);
-    ctx.lineTo(CONFIG.V_WIDTH, baseY - 110);
+    ctx.lineTo(60, baseY - 120);
+    ctx.lineTo(135, baseY - 70);
+    ctx.lineTo(220, baseY - 135);
+    ctx.lineTo(310, baseY - 85);
+    ctx.lineTo(390, baseY - 145);
+    ctx.lineTo(CONFIG.V_WIDTH, baseY - 95);
     ctx.lineTo(CONFIG.V_WIDTH, baseY);
     ctx.closePath();
     ctx.fill();
+  }
+
+  // Spectacular Fairytale Castle - Beautifully seated on the middle hill
+  drawSpectacularCastle(ctx, curr, prev, t) {
+    ctx.save();
+    const stoneCol = lerpColor(prev.castleColor, curr.castleColor, t);
+    const roofCol = lerpColor(prev.castleRoof, curr.castleRoof, t);
+    const winCol = lerpColor(prev.castleWindow, curr.castleWindow, t);
+    const baseY = CONFIG.V_HEIGHT - CONFIG.GROUND_HEIGHT - 35;
+
+    // Centered Castle Horizon Position
+    const castleX = CONFIG.V_WIDTH / 2 - 45;
+    
+    // Back Stone Curtain Wall
+    ctx.fillStyle = stoneCol;
+    ctx.fillRect(castleX - 70, baseY - 65, 230, 65);
+
+    // Stone Archways beneath wall
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.beginPath();
+    ctx.arc(castleX - 35, baseY - 10, 12, Math.PI, 0);
+    ctx.arc(castleX + 45, baseY - 10, 14, Math.PI, 0);
+    ctx.arc(castleX + 115, baseY - 10, 12, Math.PI, 0);
+    ctx.fill();
+
+    // Towers Array: [x, width, height, spireHeight, flag]
+    const towers = [
+      { x: castleX - 75, w: 26, h: 95, spireH: 35, flag: true },
+      { x: castleX - 42, w: 32, h: 125, spireH: 42, flag: false },
+      { x: castleX - 4, w: 44, h: 165, spireH: 58, flag: true }, // Grand Citadel Keep
+      { x: castleX + 48, w: 32, h: 130, spireH: 46, flag: true },
+      { x: castleX + 88, w: 34, h: 105, spireH: 36, flag: false },
+      { x: castleX + 130, w: 22, h: 80, spireH: 28, flag: true }
+    ];
+
+    towers.forEach(tw => {
+      const tx = tw.x;
+      const ty = baseY - tw.h;
+
+      // Stone Wall
+      ctx.fillStyle = stoneCol;
+      ctx.fillRect(tx, ty, tw.w, tw.h);
+
+      // Crenellations
+      const crenW = 5;
+      for (let cx = tx - 2; cx < tx + tw.w + 2; cx += crenW * 2) {
+        ctx.fillRect(cx, ty - 6, crenW, 6);
+      }
+
+      // Conical Spire Roof
+      ctx.fillStyle = roofCol;
+      ctx.beginPath();
+      ctx.moveTo(tx - 3, ty);
+      ctx.lineTo(tx + tw.w / 2, ty - tw.spireH);
+      ctx.lineTo(tx + tw.w + 3, ty);
+      ctx.closePath();
+      ctx.fill();
+
+      // Golden Tip
+      ctx.fillStyle = '#ffd54f';
+      ctx.beginPath();
+      ctx.arc(tx + tw.w / 2, ty - tw.spireH, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Fluttering Red Pennant Flags
+      if (tw.flag) {
+        const flagWave = Math.sin(this.frame * 0.16 + tw.x) * 2;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(tx + tw.w / 2, ty - tw.spireH);
+        ctx.lineTo(tx + tw.w / 2, ty - tw.spireH - 12);
+        ctx.stroke();
+
+        ctx.fillStyle = '#ff3d00';
+        ctx.beginPath();
+        ctx.moveTo(tx + tw.w / 2, ty - tw.spireH - 12);
+        ctx.lineTo(tx + tw.w / 2 + 10, ty - tw.spireH - 8 + flagWave);
+        ctx.lineTo(tx + tw.w / 2, ty - tw.spireH - 4);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Glowing Arched Castle Windows
+      ctx.fillStyle = winCol;
+      const winRows = Math.floor(tw.h / 36);
+      for (let r = 1; r <= winRows; r++) {
+        const wy = ty + r * 28;
+        ctx.beginPath();
+        ctx.roundRect(tx + tw.w / 2 - 3, wy, 6, 8.5, [3, 3, 0, 0]);
+        ctx.fill();
+      }
+    });
+
+    ctx.restore();
   }
 
   drawClouds(ctx, curr, prev, t) {
@@ -1244,47 +1829,6 @@ class FlyBirdGame {
       ctx.fill();
 
       ctx.restore();
-    });
-  }
-
-  drawCastles(ctx, curr, prev, t) {
-    const castleCol = lerpColor(prev.castleColor, curr.castleColor, t);
-    ctx.fillStyle = castleCol;
-    const baseY = CONFIG.V_HEIGHT - CONFIG.GROUND_HEIGHT - 35;
-
-    const castles = [
-      { x: 30, w: 58, h: 120, spires: [12, 30, 46] },
-      { x: 260, w: 78, h: 150, spires: [16, 40, 62] }
-    ];
-
-    castles.forEach(c => {
-      ctx.fillRect(c.x, baseY - c.h + 40, c.w, c.h);
-      for (let bx = c.x; bx < c.x + c.w; bx += 14) {
-        ctx.fillRect(bx, baseY - c.h + 30, 8, 12);
-      }
-      c.spires.forEach(spX => {
-        ctx.beginPath();
-        ctx.moveTo(c.x + spX - 9, baseY - c.h + 30);
-        ctx.lineTo(c.x + spX, baseY - c.h - 12);
-        ctx.lineTo(c.x + spX + 9, baseY - c.h + 30);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.fillRect(c.x + spX, baseY - c.h - 22, 2, 11);
-        ctx.beginPath();
-        ctx.moveTo(c.x + spX + 2, baseY - c.h - 22);
-        ctx.lineTo(c.x + spX + 9, baseY - c.h - 17);
-        ctx.lineTo(c.x + spX + 2, baseY - c.h - 12);
-        ctx.fill();
-      });
-
-      if (this.activeThemeIdx === 2) {
-        ctx.fillStyle = 'rgba(255, 238, 88, 0.85)';
-        ctx.fillRect(c.x + 16, baseY - c.h + 60, 6, 9);
-        ctx.fillRect(c.x + 36, baseY - c.h + 60, 6, 9);
-        ctx.fillRect(c.x + 26, baseY - c.h + 85, 7, 11);
-        ctx.fillStyle = castleCol;
-      }
     });
   }
 
@@ -1437,9 +1981,7 @@ class FlyBirdGame {
     });
   }
 
-  // ==========================================
-  // THE ENHANCED ROYAL BIRD (Stunning Pixar/Arcade Vector Art)
-  // ==========================================
+  // Cape-Free Royal Bird (Clean, Chubby, Twinkling Crown)
   drawRoyalBird(ctx) {
     const b = this.bird;
     ctx.save();
@@ -1452,55 +1994,15 @@ class FlyBirdGame {
     ctx.lineCap = 'round';
     [-12, 1, 15].forEach((offsetY, idx) => {
       ctx.beginPath();
-      const wave = Math.sin(this.frame * 0.24 + idx) * 4.5;
-      ctx.moveTo(-38, offsetY + wave);
-      ctx.quadraticCurveTo(-50, offsetY + wave - 3, -64, offsetY + wave + 2);
+      const wave = Math.sin(this.frame * 0.28 + idx) * 4.5;
+      ctx.moveTo(-36, offsetY + wave);
+      ctx.quadraticCurveTo(-48, offsetY + wave - 3, -62, offsetY + wave + 2);
       ctx.stroke();
     });
 
-    // 2. Billowing Royal Scarlet Cape
-    ctx.save();
-    const capeFlutter = Math.sin(this.frame * 0.4) * 7.5;
-    ctx.beginPath();
-    ctx.moveTo(-11, 4);
-    ctx.bezierCurveTo(-26, 0 + capeFlutter, -40, 14 + capeFlutter, -48, 22 + capeFlutter);
-    ctx.lineTo(-36, 31 + capeFlutter);
-    ctx.bezierCurveTo(-24, 24 + capeFlutter, -14, 19, 0, 16);
-    ctx.closePath();
-
-    const capeGrad = ctx.createLinearGradient(-48, 10, 0, 16);
-    capeGrad.addColorStop(0, '#ff5252');
-    capeGrad.addColorStop(0.35, '#e53935');
-    capeGrad.addColorStop(0.75, '#b71c1c');
-    capeGrad.addColorStop(1, '#660000');
-    ctx.fillStyle = capeGrad;
-    ctx.fill();
+    // 2. Tail Feathers
     ctx.lineWidth = 2.6;
-    ctx.strokeStyle = '#3e0606';
-    ctx.stroke();
-
-    // Fluffy Ermine Fur Trim on Cape Hem
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(-45, 24 + capeFlutter, 4.5, 0, Math.PI * 2);
-    ctx.arc(-41, 28 + capeFlutter, 5, 0, Math.PI * 2);
-    ctx.arc(-36, 31 + capeFlutter, 4.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#3e0606';
-    ctx.lineWidth = 1.6;
-    ctx.stroke();
-
-    // Royal Ermine spots
-    ctx.fillStyle = '#111';
-    ctx.beginPath();
-    ctx.arc(-41, 27 + capeFlutter, 1.4, 0, Math.PI * 2);
-    ctx.arc(-45, 23 + capeFlutter, 1.1, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
-    // 3. Layered Tail Feathers
-    ctx.lineWidth = 2.6;
-    [-7, 0, 7].forEach((to, idx) => {
+    [-7, 0, 7].forEach((to) => {
       ctx.beginPath();
       ctx.ellipse(-26, 2 + to, 9.5, 4.8, -0.28, 0, Math.PI * 2);
       const tailGrad = ctx.createLinearGradient(-35, to, -18, to);
@@ -1508,17 +2010,16 @@ class FlyBirdGame {
       tailGrad.addColorStop(1, '#1e88e5');
       ctx.fillStyle = tailGrad;
       ctx.fill();
-      ctx.strokeStyle = '#0a2e66';
+      ctx.strokeStyle = '#06285e';
       ctx.stroke();
 
-      // Tail feather highlight tip
       ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
       ctx.beginPath();
       ctx.ellipse(-30, 2 + to, 4, 1.6, -0.28, 0, Math.PI * 2);
       ctx.fill();
     });
 
-    // 4. Main Body: Chubby Vibrant Sky Blue Bird
+    // 3. Main Body
     ctx.beginPath();
     ctx.ellipse(0, 0, 25, 21, 0, 0, Math.PI * 2);
     const bodyGrad = ctx.createRadialGradient(-5, -7, 3, 0, 0, 26);
@@ -1532,13 +2033,13 @@ class FlyBirdGame {
     ctx.strokeStyle = '#06285e';
     ctx.stroke();
 
-    // Top Head Specular Highlight (3D gloss shine)
+    // Top Head 3D Specular Highlight
     ctx.fillStyle = 'rgba(255, 255, 255, 0.42)';
     ctx.beginPath();
     ctx.ellipse(-3, -12, 10, 4.5, -0.2, 0, Math.PI * 2);
     ctx.fill();
 
-    // 5. Pearlescent Creamy White Belly / Breast
+    // 4. White Belly
     ctx.beginPath();
     ctx.ellipse(7, 7, 14, 11, 0.28, 0, Math.PI * 2);
     const bellyGrad = ctx.createLinearGradient(0, -2, 12, 18);
@@ -1548,7 +2049,6 @@ class FlyBirdGame {
     ctx.fillStyle = bellyGrad;
     ctx.fill();
 
-    // Belly feather fluff contour
     ctx.strokeStyle = 'rgba(187, 222, 251, 0.6)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -1556,12 +2056,11 @@ class FlyBirdGame {
     ctx.arc(12, 11, 4.5, 0.2, Math.PI * 0.8);
     ctx.stroke();
 
-    // 6. Rosy Cheek Blush with Cute Freckles
+    // 5. Rosy Cheek Blush
     ctx.fillStyle = 'rgba(255, 105, 180, 0.72)';
     ctx.beginPath();
     ctx.ellipse(10, 6, 6, 3.8, 0, 0, Math.PI * 2);
     ctx.fill();
-    // 3 tiny cheek freckles
     ctx.fillStyle = 'rgba(255, 64, 129, 0.75)';
     [8, 10.5, 13].forEach((fx, i) => {
       ctx.beginPath();
@@ -1569,13 +2068,12 @@ class FlyBirdGame {
       ctx.fill();
     });
 
-    // 7. Flapping Multi-Feather Wing
+    // 6. Wing
     ctx.save();
-    const wingAngle = Math.sin(b.wingTimer * 10) * 0.48;
+    const wingAngle = Math.sin(b.wingTimer * 10) * 0.5;
     ctx.translate(-4, 0);
     ctx.rotate(wingAngle);
 
-    // 3 Layered feather fingers
     ctx.beginPath();
     ctx.ellipse(-5, 0, 15, 8.5, -0.2, 0, Math.PI * 2);
     const wingGrad = ctx.createLinearGradient(-16, -6, 8, 4);
@@ -1588,7 +2086,6 @@ class FlyBirdGame {
     ctx.strokeStyle = '#06285e';
     ctx.stroke();
 
-    // Feathers inside wing
     ctx.strokeStyle = '#0d47a1';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -1597,20 +2094,18 @@ class FlyBirdGame {
     ctx.lineTo(-4, 5);
     ctx.stroke();
 
-    // Wing top highlight
     ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
     ctx.beginPath();
     ctx.ellipse(-6, -3, 8, 2.5, -0.2, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
-    // 8. Disney/Pixar Style Cartoon Eyes
+    // 7. Eyes
     const eyeX = 12;
     const eyeY = -6;
     const eyeRadius = 8;
 
     if (!b.isBlinking) {
-      // Eye socket & White sclera
       ctx.beginPath();
       ctx.arc(eyeX, eyeY, eyeRadius, 0, Math.PI * 2);
       ctx.fillStyle = '#ffffff';
@@ -1619,19 +2114,16 @@ class FlyBirdGame {
       ctx.strokeStyle = '#06285e';
       ctx.stroke();
 
-      // Cyan Iris Ring
       ctx.beginPath();
       ctx.arc(eyeX + 2.5, eyeY, 4.5, 0, Math.PI * 2);
       ctx.fillStyle = '#0288d1';
       ctx.fill();
 
-      // Deep Black Pupil
       ctx.beginPath();
       ctx.arc(eyeX + 3, eyeY, 3.6, 0, Math.PI * 2);
       ctx.fillStyle = '#050c26';
       ctx.fill();
 
-      // Double Specular Reflection Glints
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
       ctx.arc(eyeX + 1.8, eyeY - 2.2, 2.3, 0, Math.PI * 2);
@@ -1641,7 +2133,6 @@ class FlyBirdGame {
       ctx.arc(eyeX + 4.2, eyeY + 1.5, 1.1, 0, Math.PI * 2);
       ctx.fill();
     } else {
-      // Cute Happy Curved Blink
       ctx.beginPath();
       ctx.arc(eyeX, eyeY, 6.5, 0.2, Math.PI - 0.2);
       ctx.lineWidth = 2.8;
@@ -1649,7 +2140,7 @@ class FlyBirdGame {
       ctx.stroke();
     }
 
-    // 9. Bright Orange Smiling Beak
+    // 8. Beak
     ctx.beginPath();
     ctx.moveTo(19, -3.5);
     ctx.quadraticCurveTo(33, 1, 30, 4.5);
@@ -1666,20 +2157,18 @@ class FlyBirdGame {
     ctx.strokeStyle = '#8d4000';
     ctx.stroke();
 
-    // Beak smile corner crease
     ctx.beginPath();
     ctx.arc(18, 2, 2.5, Math.PI * 0.8, Math.PI * 1.5);
     ctx.strokeStyle = '#8d4000';
     ctx.lineWidth = 1.8;
     ctx.stroke();
 
-    // Beak top gloss
     ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
     ctx.beginPath();
     ctx.ellipse(23, 0.5, 4.5, 1.4, 0.28, 0, Math.PI * 2);
     ctx.fill();
 
-    // 10. Golden Royal Brooch at Throat
+    // 9. Brooch
     ctx.beginPath();
     ctx.arc(6, 13, 5.5, 0, Math.PI * 2);
     const broochGrad = ctx.createRadialGradient(5, 11, 1, 6, 13, 5.5);
@@ -1692,7 +2181,6 @@ class FlyBirdGame {
     ctx.strokeStyle = '#6d3c0e';
     ctx.stroke();
 
-    // Tiny stamped crown in brooch
     ctx.fillStyle = '#6d3c0e';
     ctx.beginPath();
     ctx.moveTo(3.5, 14.5);
@@ -1703,12 +2191,11 @@ class FlyBirdGame {
     ctx.closePath();
     ctx.fill();
 
-    // 11. Golden Royal Crown on Head (Magnificent 3D Model with Twinkling Rubies)
+    // 10. Golden Royal Crown
     ctx.save();
     ctx.translate(5, -19);
     ctx.rotate(0.18);
 
-    // Crown Base Band & Peaks
     ctx.beginPath();
     ctx.moveTo(-12, 4.5);
     ctx.lineTo(12, 4.5);
@@ -1730,7 +2217,6 @@ class FlyBirdGame {
     ctx.strokeStyle = '#5d370e';
     ctx.stroke();
 
-    // Pearl band on crown base
     ctx.fillStyle = '#fff9c4';
     for (let px = -9; px <= 9; px += 4.5) {
       ctx.beginPath();
@@ -1738,7 +2224,6 @@ class FlyBirdGame {
       ctx.fill();
     }
 
-    // 3 Sparkling Faceted Ruby Jewels on Peaks
     const rubyTips = [
       { x: -14, y: -8 },
       { x: 0, y: -13 },
@@ -1754,8 +2239,7 @@ class FlyBirdGame {
       ctx.strokeStyle = '#3e0606';
       ctx.stroke();
 
-      // Twinkling sparkle star glint on gems
-      const twinkle = Math.sin(this.frame * 0.15 + idx * 2);
+      const twinkle = Math.sin(this.frame * 0.16 + idx * 2);
       if (twinkle > 0.4) {
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
@@ -1769,7 +2253,6 @@ class FlyBirdGame {
       }
     });
 
-    // Center Large Ruby on Crown Headband
     ctx.fillStyle = '#c62828';
     ctx.beginPath();
     ctx.ellipse(0, 1.5, 2.5, 1.8, 0, 0, Math.PI * 2);
@@ -1778,14 +2261,12 @@ class FlyBirdGame {
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    ctx.restore(); // Crown restore
+    ctx.restore();
 
-    ctx.restore(); // Bird transform restore
+    ctx.restore();
   }
 
-  // ==========================================
-  // FOREGROUND GROUND
-  // ==========================================
+  // Foreground Ground
   drawGround(ctx, curr, prev, t) {
     const groundY = CONFIG.V_HEIGHT - CONFIG.GROUND_HEIGHT;
     const groundH = CONFIG.GROUND_HEIGHT;
@@ -1860,9 +2341,7 @@ class FlyBirdGame {
     });
   }
 
-  // ==========================================
   // MAIN GAME LOOP
-  // ==========================================
   loop(timestamp) {
     this.update();
     this.render();
