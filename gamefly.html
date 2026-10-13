@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#1e88e5">
+  <title>Fly Bird - Royal Flight</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700;800&family=Luckiest+Guy&family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+  <!-- Desktop Presentation Stage -->
+  <div id="desktop-stage">
+
+    <!-- Desktop Controls Legend (visible on wider screens) -->
+    <aside class="desktop-controls-hint">
+      <div class="hint-title">
+        <span>🎮 CONTROALE</span>
+      </div>
+      <div class="hint-row">
+        <span>Zboară</span>
+        <span class="key-badge">SPAȚIU / TOUCH</span>
+      </div>
+      <div class="hint-row">
+        <span>Salt Rapid</span>
+        <span class="key-badge">↑ / W</span>
+      </div>
+      <div class="hint-row">
+        <span>Pauză</span>
+        <span class="key-badge">ESC / P</span>
+      </div>
+      <div class="hint-row">
+        <span>Schimbare Nivel</span>
+        <span class="key-badge">10+ PUNCTE</span>
+      </div>
+    </aside>
+
+    <!-- Main Game Container Frame -->
+    <div id="game-wrapper">
+      <!-- High-DPI Canvas -->
+      <canvas id="game-canvas"></canvas>
+
+      <!-- UI Overlay Layer -->
+      <div id="ui-layer">
+        
+        <!-- Top HUD Header -->
+        <div id="hud-top">
+          <div class="hud-left">
+            <div class="hud-pill" title="Monede Regale">
+              <div class="coin-icon">👑</div>
+              <span id="coin-count">0</span>
+            </div>
+            <div class="hud-pill" id="realm-pill">
+              <span id="realm-indicator" class="realm-badge">☀️ Ziua</span>
+            </div>
+          </div>
+
+          <div class="hud-right">
+            <button id="pause-btn" class="hud-btn" title="Pauză (Esc)">
+              <svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            </button>
+            <button id="mute-btn" class="hud-btn" title="Sunet">
+              <svg id="sound-icon-svg" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Big In-Game Score Display -->
+        <div id="in-game-score" style="display: none;">0</div>
+
+        <!-- Realm Level Up Alert Banner -->
+        <div id="realm-alert">
+          <span id="realm-alert-text">🌅 NIVEL NOU: APUS REGAL!</span>
+        </div>
+
+        <!-- 1. START SCREEN -->
+        <div id="start-screen" class="screen active">
+          
+          <!-- Handcrafted Pro Vector Royal Logo -->
+          <div class="logo-container">
+            <svg class="svg-logo-badge" viewBox="0 0 360 135" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="crownGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#fff9c4"/>
+                  <stop offset="45%" stop-color="#ffca28"/>
+                  <stop offset="100%" stop-color="#f57f17"/>
+                </linearGradient>
+
+                <linearGradient id="textGoldGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff"/>
+                  <stop offset="25%" stop-color="#fff59d"/>
+                  <stop offset="65%" stop-color="#ffb300"/>
+                  <stop offset="100%" stop-color="#e65100"/>
+                </linearGradient>
+
+                <linearGradient id="wingGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff"/>
+                  <stop offset="70%" stop-color="#e1f5fe"/>
+                  <stop offset="100%" stop-color="#b3e5fc"/>
+                </linearGradient>
+              </defs>
+
+              <!-- Left Angel Wing -->
+              <g transform="translate(18, 48) rotate(-18)">
+                <path d="M42 28 C25 24 5 18 2 34 C-1 48 18 54 36 46 C18 56 12 68 28 68 C42 68 55 52 58 40 Z" 
+                      fill="url(#wingGrad)" stroke="#3b1e08" stroke-width="4.5" stroke-linejoin="round"/>
+                <path d="M14 42 C24 44 36 38 48 35 M24 56 C34 56 46 50 54 44" 
+                      stroke="#81d4fa" stroke-width="3" stroke-linecap="round"/>
+              </g>
+
+              <!-- Right Angel Wing -->
+              <g transform="translate(342, 48) scale(-1, 1) rotate(-18)">
+                <path d="M42 28 C25 24 5 18 2 34 C-1 48 18 54 36 46 C18 56 12 68 28 68 C42 68 55 52 58 40 Z" 
+                      fill="url(#wingGrad)" stroke="#3b1e08" stroke-width="4.5" stroke-linejoin="round"/>
+                <path d="M14 42 C24 44 36 38 48 35 M24 56 C34 56 46 50 54 44" 
+                      stroke="#81d4fa" stroke-width="3" stroke-linecap="round"/>
+              </g>
+
+              <!-- Golden Crown On Top -->
+              <g transform="translate(180, 26)">
+                <path d="M-22 10 L22 10 L26 -8 L12 0 L0 -16 L-12 0 L-26 -8 Z" 
+                      fill="url(#crownGrad)" stroke="#3b1e08" stroke-width="4.5" stroke-linejoin="round"/>
+                <circle cx="-26" cy="-8" r="4.5" fill="#e53935" stroke="#3b1e08" stroke-width="2"/>
+                <circle cx="0" cy="-16" r="5" fill="#e53935" stroke="#3b1e08" stroke-width="2"/>
+                <circle cx="26" cy="-8" r="4.5" fill="#e53935" stroke="#3b1e08" stroke-width="2"/>
+                <polygon points="0,2 4,6 0,10 -4,6" fill="#e53935"/>
+              </g>
+
+              <!-- 3D Extrusion Shadows -->
+              <text x="180" y="104" text-anchor="middle" font-family="'Luckiest Guy', cursive" font-size="62" 
+                    fill="#351605" stroke="#351605" stroke-width="16" stroke-linejoin="round" letter-spacing="2">
+                Fly Bird
+              </text>
+              <text x="180" y="100" text-anchor="middle" font-family="'Luckiest Guy', cursive" font-size="62" 
+                    fill="#873c00" stroke="#873c00" stroke-width="12" stroke-linejoin="round" letter-spacing="2">
+                Fly Bird
+              </text>
+
+              <!-- White Border -->
+              <text x="180" y="97" text-anchor="middle" font-family="'Luckiest Guy', cursive" font-size="62" 
+                    fill="#ffffff" stroke="#ffffff" stroke-width="8" stroke-linejoin="round" letter-spacing="2">
+                Fly Bird
+              </text>
+
+              <!-- Gold Face -->
+              <text x="180" y="97" text-anchor="middle" font-family="'Luckiest Guy', cursive" font-size="62" 
+                    fill="url(#textGoldGrad)" letter-spacing="2">
+                Fly Bird
+              </text>
+            </svg>
+
+            <!-- Wooden Banner: Royal Flight -->
+            <div class="wood-banner">
+              <span class="leaf-left">🌿</span>
+              <span class="banner-text">Royal Flight</span>
+              <span class="leaf-right">🌿</span>
+            </div>
+          </div>
+
+          <!-- Best Score Badge -->
+          <div class="best-ribbon">
+            <span class="trophy-icon">🏆</span>
+            <span>Record Regal:</span>
+            <span id="best-score-display" class="best-ribbon-val">0</span>
+          </div>
+
+          <!-- Tap To Fly Button -->
+          <div class="tap-btn-container">
+            <button id="tap-to-fly-btn" class="btn-royal-tap">
+              <span>Tap to Fly!</span>
+              <svg class="tap-icon-svg" viewBox="0 0 24 24">
+                <path d="M9 11.24V7.5a2.5 2.5 0 0 1 5 0v3.74c1.21-.81 2-2.18 2-3.74a4.5 4.5 0 0 0-9 0c0 1.56.79 2.93 2 3.74zm9.84 4.63l-4.54-2.26a1.99 1.99 0 0 0-1.87.12l-1.43.95V7.5a1 1 0 0 0-2 0v11.77l-3.32-.7a1.53 1.53 0 0 0-1.57.55 1.5 1.5 0 0 0 .19 1.99l5.09 4.62c.74.67 1.7 1.05 2.7 1.05h6.29c1.94 0 3.59-1.41 3.91-3.32l.74-4.47c.21-1.27-.47-2.5-1.68-3.15z"/>
+              </svg>
+            </button>
+            <div class="instructions-hint">Atinge ecranul cu degetul sau apasă [Spațiu]</div>
+          </div>
+        </div>
+
+        <!-- 2. GAME OVER SCREEN -->
+        <div id="gameover-screen" class="screen">
+          <div class="royal-dialog">
+            <div class="dialog-header">
+              <span class="dialog-title">GAME OVER</span>
+            </div>
+
+            <div class="stats-board">
+              <div class="stats-row">
+                <span>Scor Curent:</span>
+                <span id="final-score" class="stats-value">0</span>
+              </div>
+              <div class="stats-row">
+                <span>Record Personal:</span>
+                <div>
+                  <span id="final-best" class="stats-value">0</span>
+                  <span id="new-record-tag" class="new-record-ribbon">NOU RECORD!</span>
+                </div>
+              </div>
+              <div class="stats-row">
+                <span>Monede Strânse:</span>
+                <span id="final-coins" class="stats-value" style="color: #f57f17;">+0</span>
+              </div>
+              <div class="stats-row">
+                <span>Regat Atins:</span>
+                <span id="final-realm" style="font-weight: 800; color: #1976d2;">☀️ Ziua</span>
+              </div>
+              <div class="stats-medal-row">
+                <span>Medalie Regală:</span>
+                <div id="medal-display" class="medal-badge">
+                  <span class="medal-icon">—</span> Niciuna
+                </div>
+              </div>
+            </div>
+
+            <div class="dialog-buttons">
+              <button id="play-again-btn" class="btn-primary">Joacă Din Nou 🔄</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. PAUSE SCREEN -->
+        <div id="pause-screen" class="screen">
+          <div class="pause-title">JOC ÎN PAUZĂ</div>
+          <div class="pause-menu">
+            <button id="resume-btn" class="btn-primary">Continuă ▶️</button>
+            <button id="pause-restart-btn" class="btn-secondary">Reîncepe 🔄</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="./game.js"></script>
+</body>
+</html>
